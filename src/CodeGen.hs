@@ -43,6 +43,7 @@ data JsExpr = JsIntLit Int
             | JsNot JsExpr
 
             | JsCall JsExpr [JsExpr]
+            | JsMethodCall JsExpr JsIdentifier [JsExpr]
             | JsLambda [JsIdentifier] [JsStatement]
             deriving (Show, Eq, Ord)
 
@@ -91,6 +92,9 @@ exprToStr (JsSubscript array idx) = exprToStr array ++ "[" ++ exprToStr idx ++ "
 
 exprToStr (JsCall f args) = exprToStr f ++ "(" ++ args' ++ ")"
   where args' = intercalate ", " $ map exprToStr args
+exprToStr (JsMethodCall receiver selector args) =
+    let args' = intercalate ", " $ map exprToStr args
+    in concat [ exprToStr receiver, ".", selector, "(", args', ")"]
 exprToStr (JsLambda args body) = "(function(" ++ args' ++ ") {" ++ body' ++ "})"
   where args' = intercalate ", " args
         body' = jsFunBodyToStr body
@@ -139,6 +143,8 @@ compileExpr (If cond thenB elseB) = JsCall lambda []
 
 compileExpr (Lambda args body) = JsLambda args $ map (JsExprStatement . compileExpr) body
 compileExpr (Call (Array exprs) [i]) = JsSubscript (JsArray $ map compileExpr exprs) (compileExpr i)
+compileExpr (Call (Ref "map") [f, array]) =
+    JsMethodCall (compileExpr array) "map" [compileExpr f]
 compileExpr (Call e args) = JsCall (compileExpr e) (map compileExpr args)
 
 compileExpr (Array es) = JsArray $ map compileExpr es

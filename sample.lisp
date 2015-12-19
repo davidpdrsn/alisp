@@ -1,3 +1,3 @@
 (defun main ()
-  (print ([1 2 3] 1)))
+  (print (map (lambda (x) (* x x)) [1 2 3])))
 
