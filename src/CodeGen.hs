@@ -145,6 +145,10 @@ compileExpr (Lambda args body) = JsLambda args $ map (JsExprStatement . compileE
 compileExpr (Call (Array exprs) [i]) = JsSubscript (JsArray $ map compileExpr exprs) (compileExpr i)
 compileExpr (Call (Ref "map") [f, array]) =
     JsMethodCall (compileExpr array) "map" [compileExpr f]
+compileExpr (Call (Ref "filter") [f, array]) =
+    JsMethodCall (compileExpr array) "filter" [compileExpr f]
+compileExpr (Call (Ref "fold") [f, start, array]) =
+    JsMethodCall (compileExpr array) "reduce" [compileExpr f, compileExpr start]
 compileExpr (Call e args) = JsCall (compileExpr e) (map compileExpr args)
 
 compileExpr (Array es) = JsArray $ map compileExpr es
