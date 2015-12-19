@@ -20,8 +20,10 @@ expr =  try (builtin2 "+" Plus)
     <|> try (builtin2 "/=" NotEq)
     <|> try (builtin2 "&&" And)
     <|> try (builtin2 "||" Or)
-    <|> try ifExpr
+    <|> try (builtin3 "if" If)
+    <|> try (builtin3 "unless" (If . Not))
     <|> try (builtin1 "print" Print)
+    <|> try (builtin1 "not" Not)
     <|> try letBinding
     <|> value (IntLit . read) (lexeme $ many1 digit)
     <|> call
@@ -35,12 +37,12 @@ expr =  try (builtin2 "+" Plus)
       exprs <- many expr
       return $ Let bindings exprs
 
-    ifExpr = parens $ do
-      _ <- symbol "if"
+    builtin3 p c = parens $ do
+      _ <- symbol p
       cond <- expr
       thenB <- expr
       elseB <- expr
-      return $ If cond thenB elseB
+      return $ c cond thenB elseB
 
     binding = parens $ do
       i <- identifier

@@ -37,6 +37,8 @@ data JsExpr = JsIntLit Int
             | JsAnd JsExpr JsExpr
             | JsOr JsExpr JsExpr
 
+            | JsNot JsExpr
+
             | JsCall JsExpr [JsExpr]
             | JsLambda [JsIdentifier] [JsStatement]
             deriving (Show, Eq, Ord)
@@ -77,6 +79,8 @@ exprToStr (JsNotEq a b) = exprToStrSym " !== " a b
 exprToStr (JsAnd a b) = exprToStrSym " && " a b
 exprToStr (JsOr a b) = exprToStrSym " || " a b
 
+exprToStr (JsNot a) = "!(" ++ exprToStr a ++ ")"
+
 exprToStr (JsCall f args) = exprToStr f ++ "(" ++ args' ++ ")"
   where args' = intercalate ", " $ map exprToStr args
 exprToStr (JsLambda args body) = "(function(" ++ args' ++ ") {" ++ body' ++ "})"
@@ -116,6 +120,8 @@ compileExpr (NotEq a b) = JsNotEq (compileExpr a) (compileExpr b)
 
 compileExpr (And a b) = JsAnd (compileExpr a) (compileExpr b)
 compileExpr (Or a b) = JsOr (compileExpr a) (compileExpr b)
+
+compileExpr (Not a) = JsNot (compileExpr a)
 
 compileExpr (If cond thenB elseB) = JsCall lambda []
     where lambda = JsLambda [] [body]

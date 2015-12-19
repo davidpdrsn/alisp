@@ -26,6 +26,8 @@ data Expr = IntLit Int
           | And Expr Expr
           | Or Expr Expr
 
+          | Not Expr
+
           | If Expr Expr Expr
 
           | Call Identifier [Expr]
