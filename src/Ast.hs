@@ -11,9 +11,23 @@ data Function = Function
 
 data Expr = IntLit Int
           | Ref Identifier
+
           | Plus Expr Expr
           | Minus Expr Expr
           | Times Expr Expr
+
+          | Greater Expr Expr
+          | GreaterEq Expr Expr
+          | Less Expr Expr
+          | LessEq Expr Expr
+          | Eq Expr Expr
+          | NotEq Expr Expr
+
+          | And Expr Expr
+          | Or Expr Expr
+
+          | If Expr Expr Expr
+
           | Call Identifier [Expr]
           | Print Expr
           | Let [(Identifier, Expr)] [Expr]

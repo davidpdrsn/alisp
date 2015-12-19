@@ -12,6 +12,15 @@ expr :: Parser Expr
 expr =  try (builtin2 "+" Plus)
     <|> try (builtin2 "-" Minus)
     <|> try (builtin2 "*" Times)
+    <|> try (builtin2 "<" Less)
+    <|> try (builtin2 ">" Greater)
+    <|> try (builtin2 "<=" LessEq)
+    <|> try (builtin2 ">=" GreaterEq)
+    <|> try (builtin2 "=" Eq)
+    <|> try (builtin2 "/=" NotEq)
+    <|> try (builtin2 "&&" And)
+    <|> try (builtin2 "||" Or)
+    <|> try ifExpr
     <|> try (builtin1 "print" Print)
     <|> try letBinding
     <|> value (IntLit . read) (lexeme $ many1 digit)
@@ -25,6 +34,13 @@ expr =  try (builtin2 "+" Plus)
       bindings <- parens $ many binding
       exprs <- many expr
       return $ Let bindings exprs
+
+    ifExpr = parens $ do
+      _ <- symbol "if"
+      cond <- expr
+      thenB <- expr
+      elseB <- expr
+      return $ If cond thenB elseB
 
     binding = parens $ do
       i <- identifier

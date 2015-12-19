@@ -16,14 +16,27 @@ genCode p = functions ++ callMain
 type JsProgram = [JsStatement]
 data JsStatement = JsExprStatement JsExpr
                  | JsAssign JsIdentifier JsExpr
+                 | JsIf JsExpr JsProgram JsProgram
                  deriving (Show, Eq, Ord)
 type JsIdentifier = String
 
 data JsExpr = JsIntLit Int
             | JsRef JsIdentifier
+
             | JsPlus JsExpr JsExpr
             | JsMinus JsExpr JsExpr
             | JsTimes JsExpr JsExpr
+
+            | JsGreater JsExpr JsExpr
+            | JsGreaterEq JsExpr JsExpr
+            | JsLess JsExpr JsExpr
+            | JsLessEq JsExpr JsExpr
+            | JsEq JsExpr JsExpr
+            | JsNotEq JsExpr JsExpr
+
+            | JsAnd JsExpr JsExpr
+            | JsOr JsExpr JsExpr
+
             | JsCall JsExpr [JsExpr]
             | JsLambda [JsIdentifier] [JsStatement]
             deriving (Show, Eq, Ord)
@@ -35,13 +48,35 @@ jsStatementToString :: JsStatement -> String
 jsStatementToString (JsAssign i e) = concat [ "var ", i, " = "
                                             , exprToStr e, ";"]
 jsStatementToString (JsExprStatement e) = exprToStr e ++ ";"
+jsStatementToString (JsIf cond thenB elseB) =
+    concat [ "if (", exprToStr cond, ")", "{"
+           , jsFunBodyToStr thenB
+           , "} else {"
+           , jsFunBodyToStr elseB
+           , "}"
+           ]
+
+exprToStrSym :: String -> JsExpr -> JsExpr -> String
+exprToStrSym s a b = exprToStr a ++ s ++ exprToStr b
 
 exprToStr :: JsExpr -> String
 exprToStr (JsIntLit i) = show i
 exprToStr (JsRef r) = r
-exprToStr (JsPlus a b) = exprToStr a ++ " + " ++ exprToStr b
-exprToStr (JsMinus a b) = exprToStr a ++ " - " ++ exprToStr b
-exprToStr (JsTimes a b) = exprToStr a ++ " * " ++ exprToStr b
+
+exprToStr (JsPlus a b) = exprToStrSym "-" a b
+exprToStr (JsMinus a b) = exprToStrSym " - " a b
+exprToStr (JsTimes a b) = exprToStrSym " * " a b
+
+exprToStr (JsGreater a b) = exprToStrSym " > " a b
+exprToStr (JsGreaterEq a b) = exprToStrSym " >= " a b
+exprToStr (JsLess a b) = exprToStrSym " < " a b
+exprToStr (JsLessEq a b) = exprToStrSym " <= " a b
+exprToStr (JsEq a b) = exprToStrSym " === " a b
+exprToStr (JsNotEq a b) = exprToStrSym " !== " a b
+
+exprToStr (JsAnd a b) = exprToStrSym " && " a b
+exprToStr (JsOr a b) = exprToStrSym " || " a b
+
 exprToStr (JsCall f args) = exprToStr f ++ "(" ++ args' ++ ")"
   where args' = intercalate ", " $ map exprToStr args
 exprToStr (JsLambda args body) = "(function(" ++ args' ++ ") {" ++ body' ++ "})"
@@ -67,9 +102,27 @@ compileFun f = JsAssign name (JsLambda args body)
 compileExpr :: Expr -> JsExpr
 compileExpr (IntLit i) = JsIntLit i
 compileExpr (Ref r) = JsRef r
+
 compileExpr (Plus a b) = JsPlus (compileExpr a) (compileExpr b)
 compileExpr (Minus a b) = JsMinus (compileExpr a) (compileExpr b)
 compileExpr (Times a b) = JsTimes (compileExpr a) (compileExpr b)
+
+compileExpr (Greater a b) = JsGreater (compileExpr a) (compileExpr b)
+compileExpr (GreaterEq a b) = JsGreaterEq (compileExpr a) (compileExpr b)
+compileExpr (Less a b) = JsLess (compileExpr a) (compileExpr b)
+compileExpr (LessEq a b) = JsLessEq (compileExpr a) (compileExpr b)
+compileExpr (Eq a b) = JsEq (compileExpr a) (compileExpr b)
+compileExpr (NotEq a b) = JsNotEq (compileExpr a) (compileExpr b)
+
+compileExpr (And a b) = JsAnd (compileExpr a) (compileExpr b)
+compileExpr (Or a b) = JsOr (compileExpr a) (compileExpr b)
+
+compileExpr (If cond thenB elseB) = JsCall lambda []
+    where lambda = JsLambda [] [body]
+          body = JsIf (compileExpr cond) [thenB'] [elseB']
+          thenB' = JsExprStatement $ compileExpr thenB
+          elseB' = JsExprStatement $ compileExpr elseB
+
 compileExpr (Call f args) = JsCall (JsRef f) (map compileExpr args)
 compileExpr (Let bindings exprs) =
     let bindings' = map (uncurry compileBinding) bindings
