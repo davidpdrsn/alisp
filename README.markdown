@@ -48,3 +48,12 @@ Which you can then run and get the following result:
 [ 1 ]
 10
 ```
+
+## Todo list
+
+- [ ] Comments
+- [ ] Hashes
+- [ ] Move JS Ast into its own module
+- [ ] Don't compile expression twice in print
+- [ ] Type checking (type inference)
+- [ ] Interpreter
