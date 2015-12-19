@@ -37,6 +37,9 @@ data JsExpr = JsIntLit Int
             | JsAnd JsExpr JsExpr
             | JsOr JsExpr JsExpr
 
+            | JsArray [JsExpr]
+            | JsSubscript JsExpr JsExpr
+
             | JsNot JsExpr
 
             | JsCall JsExpr [JsExpr]
@@ -65,7 +68,7 @@ exprToStr :: JsExpr -> String
 exprToStr (JsIntLit i) = show i
 exprToStr (JsRef r) = r
 
-exprToStr (JsPlus a b) = exprToStrSym "-" a b
+exprToStr (JsPlus a b) = exprToStrSym " + " a b
 exprToStr (JsMinus a b) = exprToStrSym " - " a b
 exprToStr (JsTimes a b) = exprToStrSym " * " a b
 
@@ -80,6 +83,11 @@ exprToStr (JsAnd a b) = exprToStrSym " && " a b
 exprToStr (JsOr a b) = exprToStrSym " || " a b
 
 exprToStr (JsNot a) = "!(" ++ exprToStr a ++ ")"
+
+exprToStr (JsArray es) = "[" ++ elements ++ "]"
+  where elements = intercalate ", " $ map exprToStr es
+
+exprToStr (JsSubscript array idx) = exprToStr array ++ "[" ++ exprToStr idx ++ "]"
 
 exprToStr (JsCall f args) = exprToStr f ++ "(" ++ args' ++ ")"
   where args' = intercalate ", " $ map exprToStr args
@@ -130,7 +138,10 @@ compileExpr (If cond thenB elseB) = JsCall lambda []
           elseB' = JsExprStatement $ compileExpr elseB
 
 compileExpr (Lambda args body) = JsLambda args $ map (JsExprStatement . compileExpr) body
-compileExpr (Call f args) = JsCall (JsRef f) (map compileExpr args)
+compileExpr (Call (Array exprs) [i]) = JsSubscript (JsArray $ map compileExpr exprs) (compileExpr i)
+compileExpr (Call e args) = JsCall (compileExpr e) (map compileExpr args)
+
+compileExpr (Array es) = JsArray $ map compileExpr es
 
 compileExpr (Let bindings exprs) =
     let bindings' = map (uncurry compileBinding) bindings

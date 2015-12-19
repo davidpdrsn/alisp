@@ -30,8 +30,10 @@ data Expr = IntLit Int
 
           | If Expr Expr Expr
 
-          | Call Identifier [Expr]
+          | Call Expr [Expr]
           | Lambda [Identifier] [Expr]
+
+          | Array [Expr]
 
           | Print Expr
           | Let [(Identifier, Expr)] [Expr]

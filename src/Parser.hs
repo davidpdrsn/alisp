@@ -26,11 +26,18 @@ expr =  try (builtin2 "+" Plus)
     <|> try (builtin1 "not" Not)
     <|> try letBinding
     <|> try lambda
+    <|> try array
     <|> value (IntLit . read) (lexeme $ many1 digit)
     <|> call
     <|> reference
   where
     value f p = liftM f $ try $ parens p <|> p
+
+    array = do
+      _ <- symbol "["
+      exprs <- expr `sepBy` spaces
+      _ <- symbol "]"
+      return $ Array exprs
 
     lambda = parens $ do
       _ <- symbol "lambda"
@@ -59,9 +66,9 @@ expr =  try (builtin2 "+" Plus)
     reference = liftM Ref identifier
 
     call = parens $ do
-      i <- identifier
+      e <- expr
       args <- many expr
-      return $ Call i args
+      return $ Call e args
 
     builtin1 s c = parens $ do
       _ <- symbol s
