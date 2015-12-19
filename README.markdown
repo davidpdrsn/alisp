@@ -1,0 +1,50 @@
+# alisp
+
+This is a small toy language I made to practice compiling stuff into JavaScript.
+
+## Example
+
+Write some code like this:
+
+```lisp
+(defun add (a b)
+  (+ a b))
+
+(defun main ()
+  (print (filter (lambda (x) (< x 2)) [1 2 3 4]))
+  (print (fold add 0 [1 2 3 4])))
+```
+
+Compile it like this:
+
+`$ alisp foo.lisp`
+
+And get some JavaScript like this:
+
+```javascript
+var add = (function (a, b) {
+    return a + b
+});
+var main = (function () {
+    (function () {
+        console.log([1, 2, 3, 4].filter((function (x) {
+            return x < 2
+        })));
+        return [1, 2, 3, 4].filter((function (x) {
+            return x < 2
+        }))
+    })();
+    return (function () {
+        console.log([1, 2, 3, 4].reduce(add, 0));
+        return [1, 2, 3, 4].reduce(add, 0)
+    })()
+});
+main();
+```
+
+Which you can then run and get the following result:
+
+```javascript
+[ 1 ]
+10
+```
