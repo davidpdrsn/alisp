@@ -129,7 +129,9 @@ compileExpr (If cond thenB elseB) = JsCall lambda []
           thenB' = JsExprStatement $ compileExpr thenB
           elseB' = JsExprStatement $ compileExpr elseB
 
+compileExpr (Lambda args body) = JsLambda args $ map (JsExprStatement . compileExpr) body
 compileExpr (Call f args) = JsCall (JsRef f) (map compileExpr args)
+
 compileExpr (Let bindings exprs) =
     let bindings' = map (uncurry compileBinding) bindings
         exprs' = map (JsExprStatement . compileExpr) exprs

@@ -31,6 +31,8 @@ data Expr = IntLit Int
           | If Expr Expr Expr
 
           | Call Identifier [Expr]
+          | Lambda [Identifier] [Expr]
+
           | Print Expr
           | Let [(Identifier, Expr)] [Expr]
           deriving (Show, Eq, Ord)

@@ -25,11 +25,18 @@ expr =  try (builtin2 "+" Plus)
     <|> try (builtin1 "print" Print)
     <|> try (builtin1 "not" Not)
     <|> try letBinding
+    <|> try lambda
     <|> value (IntLit . read) (lexeme $ many1 digit)
     <|> call
     <|> reference
   where
     value f p = liftM f $ try $ parens p <|> p
+
+    lambda = parens $ do
+      _ <- symbol "lambda"
+      args <- arguments
+      body <- many expr
+      return $ Lambda args body
 
     letBinding = parens $ do
       _ <- symbol "let"
