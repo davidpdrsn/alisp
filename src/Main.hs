@@ -7,6 +7,7 @@ import TypeChecker
 import Data.List
 import System.Directory
 import System.Environment
+import Interpret
 
 doc :: [String]
 doc = [ "Usage: alisp <filename>"
@@ -35,7 +36,11 @@ runFile filename = do
       source <- readFile filename
       case parse source of
         Right ast -> if typed ast
-                       then putStrLn $ jsToString $ genCode ast
+                       then do
+                         result <- interpret ast
+                         case result of
+                           Just err -> putStrLn err
+                           Nothing -> return ()
                        else putStrLn "Type error"
         Left e -> print e
     else putStrLn $ show filename ++ " was not found"
