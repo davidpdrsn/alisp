@@ -53,7 +53,8 @@ Which you can then run and get the following result:
 
 - [ ] Comments
 - [ ] Hashes
-- [ ] Move JS Ast into its own module
+- [ ] Break up code generation mode into three modules. (1) js ast, (2) lisp ast -> js ast, (3) js ast -> js code
 - [ ] Don't compile expression twice in print
 - [ ] Type checking (type inference)
 - [ ] Interpreter
+- [ ] Include positions in the program for each expression
