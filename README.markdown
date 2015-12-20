@@ -52,6 +52,7 @@ Which you can then run and get the following result:
 ## Todo list
 
 - [ ] Comments
+- [ ] Strings
 - [ ] Hashes
 - [x] Break up code generation mode into three modules. (1) js ast, (2) lisp ast -> js ast, (3) js ast -> js code
 - [ ] Don't compile expression twice in print
