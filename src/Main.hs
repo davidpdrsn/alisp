@@ -1,6 +1,7 @@
 module Main where
 
-import CodeGen
+import CodeGen.LispToJs
+import CodeGen.JsToStr
 import Parser
 import TypeChecker
 import Data.List
@@ -34,7 +35,7 @@ runFile filename = do
       source <- readFile filename
       case parse source of
         Right ast -> if typed ast
-                       then putStrLn $ genCode ast
+                       then putStrLn $ jsToString $ genCode ast
                        else putStrLn "Type error"
         Left e -> print e
     else putStrLn $ show filename ++ " was not found"
