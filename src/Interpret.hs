@@ -5,6 +5,7 @@ module Interpret
 
 import Ast
 import Control.Monad.Trans.State
+import Data.List (intercalate)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Control.Monad
@@ -28,10 +29,12 @@ type FunTab = Map Identifier Function
 
 data Value = IntVal Int
            | BoolVal Bool
+           | ArrayVal [Value]
 
 instance Show Value where
     show (IntVal a) = show a
     show (BoolVal a) = show a
+    show (ArrayVal a) = "[" ++ intercalate ", " (map show a) ++ "]"
 
 instance Num Value where
     (IntVal a) + (IntVal b) = IntVal $ a + b
