@@ -120,7 +120,9 @@ eval (If cond thenB elseB) = do
     _ -> eval elseB
 eval (Call f params) = error "Calling functions are not yet implemenetd"
 eval (Lambda args body) = error "Lambda expressions are not yet implemenetd"
-eval (Array elements) = error "Arrays are not yet implemented"
+eval (Array elements) = do
+    x <- mapM eval elements
+    return $ ArrayVal x
 eval (Print a) = do
     a' <- eval a
     liftIO $ print a'
