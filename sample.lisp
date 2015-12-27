@@ -1,4 +1,7 @@
+(defun fact (n)
+  (if (= 0 n)
+    1
+    (* n (fact (- n 1)))))
+
 (defun main ()
-  (print (lambda ()
-           123
-           (+ 1 2))))
+  (print (fact 100)))

@@ -27,7 +27,7 @@ interpret p =
 type SymTab = Map String Value
 type FunTab = SymTab
 
-data Value = IntVal Int
+data Value = IntVal Integer
            | BoolVal Bool
            | ArrayVal [Value]
            | LambdaVal [Identifier] [Expr]
@@ -63,7 +63,13 @@ instance Eq Value where
     (==) _ _ = error "Type error: Should have been caught by the type checker"
 
 evalExprs :: [Expr] -> StateT (SymTab, FunTab) IO (Either String Value)
-evalExprs = foldM (\_ expr -> runEvalLisp $ eval expr) (Right $ IntVal 0) -- TODO: acc not used?!
+evalExprs [] = return $ Left "No expressions to evaluate"
+evalExprs [e] = runEvalLisp $ eval e
+evalExprs (e : es) = do
+    e' <- runEvalLisp $ eval e
+    case e' of
+      Left err' -> return $ Left err'
+      Right _ -> evalExprs es
 
 bindArgs :: (Monad a) => [(Identifier, Value)] -> StateT (SymTab, FunTab) a ()
 bindArgs [] = return ()
@@ -131,11 +137,11 @@ call (LambdaVal params body) args = EvalLisp $ do
     result <- evalExprs body
     put prev
     return result
-call (ArrayVal vals) [IntVal n] = case vals `safeIdx` n of
+call (ArrayVal vals) [IntVal n] = case vals `safeIdx` fromIntegral n of
                                     Nothing -> err "Array index failure"
                                     Just x -> return x
 call (ArrayVal _) _ = err "Wrong number of arguments to array"
-call _ _ = err "Not a function"
+call i _ = err $ show i ++ " is not a function"
 
 safeIdx :: [a] -> Int -> Maybe a
 safeIdx [] _ = Nothing

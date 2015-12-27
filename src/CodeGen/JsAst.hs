@@ -7,7 +7,7 @@ data Statement = ExprStatement Expr
                deriving (Show, Eq, Ord)
 type Identifier = String
 
-data Expr = IntLit Int
+data Expr = IntLit Integer
           | Ref Identifier
 
           | Plus Expr Expr

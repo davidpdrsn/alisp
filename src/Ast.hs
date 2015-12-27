@@ -9,7 +9,7 @@ data Function = Function
               }
               deriving (Show, Eq, Ord)
 
-data Expr = IntLit Int
+data Expr = IntLit Integer
           | Ref Identifier
 
           | Plus Expr Expr
