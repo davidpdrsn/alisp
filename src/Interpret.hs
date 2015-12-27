@@ -36,7 +36,8 @@ instance Show Value where
     show (IntVal a) = show a
     show (BoolVal a) = show a
     show (ArrayVal a) = "[" ++ unwords (map show a) ++ "]"
-    show (LambdaVal _ _) = show "(lambda)"
+    show (LambdaVal params body) =
+      show $ Lambda params body
 
 instance Num Value where
     (IntVal a) + (IntVal b) = IntVal $ a + b
