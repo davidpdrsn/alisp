@@ -17,7 +17,7 @@ interpret p =
     in case M.lookup "main" ftab of
          Nothing -> return $ Just "function \"main\" is not defined"
          Just main -> do
-           result <- evalStateT (call main []) (M.empty, buildFunctionTable p)
+           result <- evalStateT (runEvalLisp $ call main []) (buildFunctionTable p)
            case result of
              Left e -> return $ Just e
              _ -> return Nothing
@@ -25,11 +25,11 @@ interpret p =
 ----
 
 type SymTab = Map String Value
-type FunTab = Map Identifier Function
 
 data Value = IntVal Int
            | BoolVal Bool
            | ArrayVal [Value]
+           | LambdaVal [Identifier] [Expr]
 
 instance Show Value where
     show (IntVal a) = show a
@@ -59,31 +59,19 @@ instance Eq Value where
     (==) (BoolVal a) (BoolVal b) = a == b
     (==) _ _ = error "Type error: Should have been caught by the type checker"
 
-call :: Function -> [Expr] -> StateT (SymTab, FunTab) IO (Either String Value)
-call f params = do
-    paramsOrError <- sequence <$> mapM (runEvalLisp . eval) params
-    case paramsOrError of
-      Left e -> return $ Left e
-      Right args ->
-        case bindParams (funArgs f) args of
-          Left (required, given) -> return $ Left $ wrongArgMessage required given
-          Right args' -> do
-            before <- get
-            bindArgs args'
-            result <- evalExprs $ funBody f
-            put before
-            return result
-
-evalExprs :: [Expr] -> StateT (SymTab, FunTab) IO (Either String Value)
+evalExprs :: [Expr] -> StateT SymTab IO (Either String Value)
 evalExprs = foldM (\_ expr -> runEvalLisp $ eval expr) (Right $ IntVal 0) -- TODO: acc not used?!
 
-bindArgs :: (Monad a) => [(Identifier, Value)] -> StateT (SymTab, FunTab) a ()
+bindArgs :: (Monad a) => [(Identifier, Value)] -> StateT SymTab a ()
 bindArgs [] = return ()
 bindArgs ((p, a) : rest) = do
-    (vtab, ftab) <- get
-    let vtab' = M.insert p a vtab
-    put (vtab', ftab)
+    update $ M.insert p a
     bindArgs rest
+
+update f = do
+    s <- get
+    let s' = f s
+    put s'
 
 wrongArgMessage :: Int -> Int -> String
 wrongArgMessage required given =
@@ -97,7 +85,7 @@ bindParams params args = if length params == length args
 eval :: Expr -> EvalLisp Value
 eval (IntLit a) = return $ IntVal a
 eval (Ref a) = EvalLisp $ do
-    tab <- symtab
+    tab <- get
     case M.lookup a tab of
       Just x -> return $ Right x
       Nothing -> return $ Left $ a ++ " is undefined"
@@ -118,8 +106,13 @@ eval (If cond thenB elseB) = do
   case cond' of
     (BoolVal True) -> eval thenB
     _ -> eval elseB
-eval (Call f params) = error "Calling functions are not yet implemenetd"
-eval (Lambda args body) = error "Lambda expressions are not yet implemenetd"
+eval (Call e params) = do
+    e' <- eval e
+    params' <- mapM eval params
+    call e' params'
+-- eval (Call e@(Lambda _ _) params) = undefined
+-- eval (Call e@(Array _) params) = undefined
+eval (Lambda args body) = return $ LambdaVal args body
 eval (Array elements) = do
     x <- mapM eval elements
     return $ ArrayVal x
@@ -130,10 +123,13 @@ eval (Print a) = do
 eval (Let bindings body) = do
     values <- mapM (\(i, e) -> do { e' <- eval e; return (i, e') }) bindings
     EvalLisp $ do
-      (s, ftab) <- get
+      s <- get
       let s' = foldr (uncurry M.insert) s values
-      put (s', ftab)
+      put s'
       evalExprs body
+
+call :: Value -> [Value] -> EvalLisp Value
+call f params = undefined
 
 boolValNot :: Value -> Value
 boolValNot (BoolVal a) = BoolVal $ not a
@@ -147,18 +143,12 @@ boolValOr :: Value -> Value -> Value
 boolValOr (BoolVal a) (BoolVal b) = BoolVal $ a || b
 boolValOr _ _ = error "Type error: Should have been caught by the type checker"
 
-buildFunctionTable :: [Function] -> FunTab
-buildFunctionTable = M.fromList . map (\f -> (funName f, f))
-
-symtab :: Monad b => StateT (SymTab, a) b SymTab
-symtab = fst <$> get
-
-funtab :: Monad b => StateT (a, FunTab) b FunTab
-funtab = snd <$> get
+buildFunctionTable :: [Function] -> SymTab
+buildFunctionTable = M.fromList . map (\f -> (funName f, LambdaVal (funArgs f) (funBody f)))
 
 -- | EvalLisp helper type
 
-newtype EvalLisp a = EvalLisp { runEvalLisp :: StateT (SymTab, FunTab) IO (Either String a) }
+newtype EvalLisp a = EvalLisp { runEvalLisp :: StateT SymTab IO (Either String a) }
 
 instance Functor EvalLisp where
     fmap f (EvalLisp x) = EvalLisp $ do
