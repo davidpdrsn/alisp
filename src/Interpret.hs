@@ -96,7 +96,11 @@ bindParams params args = if length params == length args
 
 eval :: Expr -> EvalLisp Value
 eval (IntLit a) = return $ IntVal a
-eval (Ref a) = error "References are not yet implemenetd"
+eval (Ref a) = EvalLisp $ do
+    tab <- symtab
+    case M.lookup a tab of
+      Just x -> return $ Right x
+      Nothing -> return $ Left $ a ++ " is undefined"
 eval (Plus a b) = (+) <$> eval a <*> eval b
 eval (Minus a b) = (-) <$> eval a <*> eval b
 eval (Times a b) = (*) <$> eval a <*> eval b
@@ -121,7 +125,13 @@ eval (Print a) = do
     a' <- eval a
     liftIO $ print a'
     return a'
-eval (Let bindings body) = error "Let bindings are not yet implemented"
+eval (Let bindings body) = do
+    values <- mapM (\(i, e) -> do { e' <- eval e; return (i, e') }) bindings
+    EvalLisp $ do
+      (s, ftab) <- get
+      let s' = foldr (uncurry M.insert) s values
+      put (s', ftab)
+      evalExprs body
 
 boolValNot :: Value -> Value
 boolValNot (BoolVal a) = BoolVal $ not a
@@ -137,6 +147,12 @@ boolValOr _ _ = error "Type error: Should have been caught by the type checker"
 
 buildFunctionTable :: [Function] -> FunTab
 buildFunctionTable = M.fromList . map (\f -> (funName f, f))
+
+symtab :: Monad b => StateT (SymTab, a) b SymTab
+symtab = fst <$> get
+
+funtab :: Monad b => StateT (a, FunTab) b FunTab
+funtab = snd <$> get
 
 -- | EvalLisp helper type
 
