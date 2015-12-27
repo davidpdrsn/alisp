@@ -17,7 +17,7 @@ Write some code like this:
 
 Compile it like this:
 
-`$ alisp foo.lisp`
+`$ alisp foo.lisp -c`
 
 And get some JavaScript like this:
 
@@ -49,14 +49,19 @@ Which you can then run and get the following result:
 10
 ```
 
+## Options
+
+- `-i`: Interpret file
+- `-c`: Compile file to JavaScript
+
 ## Todo list
 
 - [ ] Comments
 - [ ] Strings
-- [ ] Add options for either compiling or interpreting the given file
+- [x] Add options for either compiling or interpreting the given file
 - [ ] Hashes
 - [x] Break up code generation mode into three modules. (1) js ast, (2) lisp ast -> js ast, (3) js ast -> js code
 - [ ] Don't compile expression twice in print
 - [ ] Type checking (type inference)
-- [ ] Interpreter
+- [x] Interpreter
 - [ ] Include positions in the program for each expression
