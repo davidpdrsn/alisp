@@ -5,11 +5,11 @@ module Interpret
 
 import Ast
 import Control.Monad.Trans.State
-import Data.List (intercalate)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Control.Monad
 import Control.Monad.IO.Class
+import Control.Arrow (first)
 
 interpret :: Program -> IO (Maybe String)
 interpret p =
@@ -17,7 +17,7 @@ interpret p =
     in case M.lookup "main" ftab of
          Nothing -> return $ Just "function \"main\" is not defined"
          Just main -> do
-           result <- evalStateT (runEvalLisp $ call main []) (buildFunctionTable p)
+           result <- evalStateT (runEvalLisp (call main [])) (ftab, ftab)
            case result of
              Left e -> return $ Just e
              _ -> return Nothing
@@ -25,6 +25,7 @@ interpret p =
 ----
 
 type SymTab = Map String Value
+type FunTab = SymTab
 
 data Value = IntVal Int
            | BoolVal Bool
@@ -34,7 +35,8 @@ data Value = IntVal Int
 instance Show Value where
     show (IntVal a) = show a
     show (BoolVal a) = show a
-    show (ArrayVal a) = "[" ++ intercalate ", " (map show a) ++ "]"
+    show (ArrayVal a) = "[" ++ unwords (map show a) ++ "]"
+    show (LambdaVal _ _) = show "(lambda)"
 
 instance Num Value where
     (IntVal a) + (IntVal b) = IntVal $ a + b
@@ -59,48 +61,42 @@ instance Eq Value where
     (==) (BoolVal a) (BoolVal b) = a == b
     (==) _ _ = error "Type error: Should have been caught by the type checker"
 
-evalExprs :: [Expr] -> StateT SymTab IO (Either String Value)
+evalExprs :: [Expr] -> StateT (SymTab, FunTab) IO (Either String Value)
 evalExprs = foldM (\_ expr -> runEvalLisp $ eval expr) (Right $ IntVal 0) -- TODO: acc not used?!
 
-bindArgs :: (Monad a) => [(Identifier, Value)] -> StateT SymTab a ()
+bindArgs :: (Monad a) => [(Identifier, Value)] -> StateT (SymTab, FunTab) a ()
 bindArgs [] = return ()
 bindArgs ((p, a) : rest) = do
-    update $ M.insert p a
+    update $ first $ M.insert p a
     bindArgs rest
 
+update :: Monad m => (a -> a) -> StateT a m ()
 update f = do
     s <- get
     let s' = f s
     put s'
 
-wrongArgMessage :: Int -> Int -> String
-wrongArgMessage required given =
-    "Wrong number of arguments, " ++ show required ++ " given, " ++ show given ++ " given"
-
-bindParams :: [Identifier] -> [Value] -> Either (Int, Int) [(Identifier, Value)]
-bindParams params args = if length params == length args
-                           then Right $ zip params args
-                           else Left (length params, length args)
-
 eval :: Expr -> EvalLisp Value
 eval (IntLit a) = return $ IntVal a
 eval (Ref a) = EvalLisp $ do
-    tab <- get
-    case M.lookup a tab of
-      Just x -> return $ Right x
-      Nothing -> return $ Left $ a ++ " is undefined"
-eval (Plus a b) = (+) <$> eval a <*> eval b
-eval (Minus a b) = (-) <$> eval a <*> eval b
-eval (Times a b) = (*) <$> eval a <*> eval b
-eval (Greater a b) = ((BoolVal .) . (>)) <$> eval a <*> eval b
+    (vtab, ftab) <- get
+    runEvalLisp $ case M.lookup a vtab of
+                    Just x -> EvalLisp $ return $ Right x
+                    Nothing -> case M.lookup a ftab of
+                                 Just x -> EvalLisp $ return $ Right x
+                                 Nothing -> err $ a ++ " is undefined"
+eval (Plus a b)      = (+) <$> eval a <*> eval b
+eval (Minus a b)     = (-) <$> eval a <*> eval b
+eval (Times a b)     = (*) <$> eval a <*> eval b
+eval (Greater a b)   = ((BoolVal .) . (>))  <$> eval a <*> eval b
 eval (GreaterEq a b) = ((BoolVal .) . (>=)) <$> eval a <*> eval b
-eval (Less a b) = ((BoolVal .) . (<)) <$> eval a <*> eval b
-eval (LessEq a b) = ((BoolVal .) . (<=)) <$> eval a <*> eval b
-eval (Eq a b) = ((BoolVal .) . (==)) <$> eval a <*> eval b
-eval (NotEq a b) = ((BoolVal .) . (/=)) <$> eval a <*> eval b
-eval (And a b) = boolValAnd <$> eval a <*> eval b
-eval (Or a b) = boolValOr <$> eval a <*> eval b
-eval (Not a) = boolValNot <$> eval a
+eval (Less a b)      = ((BoolVal .) . (<))  <$> eval a <*> eval b
+eval (LessEq a b)    = ((BoolVal .) . (<=)) <$> eval a <*> eval b
+eval (Eq a b)        = ((BoolVal .) . (==)) <$> eval a <*> eval b
+eval (NotEq a b)     = ((BoolVal .) . (/=)) <$> eval a <*> eval b
+eval (And a b)       = boolValAnd <$> eval a <*> eval b
+eval (Or a b)        = boolValOr <$> eval a <*> eval b
+eval (Not a)         = boolValNot <$> eval a
 eval (If cond thenB elseB) = do
   cond' <- eval cond
   case cond' of
@@ -110,8 +106,6 @@ eval (Call e params) = do
     e' <- eval e
     params' <- mapM eval params
     call e' params'
--- eval (Call e@(Lambda _ _) params) = undefined
--- eval (Call e@(Array _) params) = undefined
 eval (Lambda args body) = return $ LambdaVal args body
 eval (Array elements) = do
     x <- mapM eval elements
@@ -120,16 +114,32 @@ eval (Print a) = do
     a' <- eval a
     liftIO $ print a'
     return a'
-eval (Let bindings body) = do
-    values <- mapM (\(i, e) -> do { e' <- eval e; return (i, e') }) bindings
+eval (Let [] body) = EvalLisp $ evalExprs body
+eval (Let ((i, e) : bindings) body) = do
+    v <- eval e
     EvalLisp $ do
-      s <- get
-      let s' = foldr (uncurry M.insert) s values
-      put s'
-      evalExprs body
+      update $ first $ M.insert i v
+      runEvalLisp $ eval (Let bindings body)
 
 call :: Value -> [Value] -> EvalLisp Value
-call f params = undefined
+call (LambdaVal params _) args | length params /= length args = err "Wrong number of arguments"
+call (LambdaVal params body) args = EvalLisp $ do
+    prev@(_, funs) <- get
+    put (M.empty, funs)
+    bindArgs $ zip params args
+    result <- evalExprs body
+    put prev
+    return result
+call (ArrayVal vals) [IntVal n] = case vals `safeIdx` n of
+                                    Nothing -> err "Array index failure"
+                                    Just x -> return x
+call (ArrayVal _) _ = err "Wrong number of arguments to array"
+call _ _ = err "Not a function"
+
+safeIdx :: [a] -> Int -> Maybe a
+safeIdx [] _ = Nothing
+safeIdx (x : _) 0 = Just x
+safeIdx (_ : rest) n = safeIdx rest (n - 1)
 
 boolValNot :: Value -> Value
 boolValNot (BoolVal a) = BoolVal $ not a
@@ -148,7 +158,7 @@ buildFunctionTable = M.fromList . map (\f -> (funName f, LambdaVal (funArgs f) (
 
 -- | EvalLisp helper type
 
-newtype EvalLisp a = EvalLisp { runEvalLisp :: StateT SymTab IO (Either String a) }
+newtype EvalLisp a = EvalLisp { runEvalLisp :: StateT (SymTab, FunTab) IO (Either String a) }
 
 instance Functor EvalLisp where
     fmap f (EvalLisp x) = EvalLisp $ do
@@ -166,6 +176,9 @@ instance Applicative EvalLisp where
         f'' <- f'
         x'' <- x'
         return $ f'' x''
+
+err :: String -> EvalLisp a
+err = EvalLisp . return . Left
 
 instance Monad EvalLisp where
     return = pure
